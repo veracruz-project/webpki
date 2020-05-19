@@ -58,15 +58,18 @@ exclude = ["/sgx/*"]
 [lib]
 name = "webpki"
 path = "src/webpki.rs"
+    
+[target.'cfg(target_os="optee")'.dependencies]
+optee-utee = { path = "/work/rust-optee-trustzone-sdk/optee-utee" }
 
 [features]
-default = ["std", "trust_anchor_util", "mesalock_sgx"]
+default = ["std", "trust_anchor_util", "ring/non_sgx"]
 trust_anchor_util = ["std"]
-std = ["mesalock_sgx"]
-mesalock_sgx = ["sgx_tstd"]
+std = []
+mesalock_sgx = ["sgx_tstd","ring/mesalock_sgx"]
 
 [dependencies]
-ring = { git = "https://github.com/mesalock-linux/ring-sgx", tag = "v0.16.5" }
+ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
 untrusted = "0.7.0"
 sgx_tstd = { rev = "v1.1.2", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true }
 

@@ -55,6 +55,10 @@ use std::prelude::v1::*;
 #[macro_use]
 extern crate std;
 
+#[cfg(target_os="optee")]
+extern crate optee_utee;
+
+
 #[macro_use]
 mod der;
 
