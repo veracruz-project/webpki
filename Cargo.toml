@@ -60,7 +60,7 @@ name = "webpki"
 path = "src/webpki.rs"
     
 [target.'cfg(target_os="optee")'.dependencies]
-optee-utee = { path = "/work/rust-optee-trustzone-sdk/optee-utee" }
+optee-utee = { git = "https://github.com/veracruz-project/rust-optee-trustzone-sdk.git", branch = "veracruz" }
 
 [features]
 default = ["std", "trust_anchor_util", "ring/non_sgx"]
