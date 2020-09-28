@@ -159,6 +159,9 @@ fn check_issuer_independent_properties(
     // See the comment in `remember_extension` for why we don't check the
     // KeyUsage extension.
 
+    // for certain platforms, we don't have a system time, so don't check validity.
+    // I know this is bad. I'll try to do better
+    #[cfg(target_os = "linux")]
     cert.validity
         .read_all(Error::BadDER, |value| check_validity(value, time))?;
     untrusted::read_all_optional(cert.basic_constraints, Error::BadDER, |value| {
@@ -172,6 +175,7 @@ fn check_issuer_independent_properties(
 }
 
 // https://tools.ietf.org/html/rfc5280#section-4.1.2.5
+#[cfg(target_os = "linux")]
 fn check_validity(input: &mut untrusted::Reader, time: time::Time) -> Result<(), Error> {
     let not_before = der::time_choice(input)?;
     let not_after = der::time_choice(input)?;
