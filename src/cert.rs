@@ -13,6 +13,7 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 use crate::{der, signed_data, Error};
+use std::collections::HashMap;
 
 pub enum EndEntityOrCA<'a> {
     EndEntity,
@@ -32,6 +33,7 @@ pub struct Cert<'a> {
     pub eku: Option<untrusted::Input<'a>>,
     pub name_constraints: Option<untrusted::Input<'a>>,
     pub subject_alt_name: Option<untrusted::Input<'a>>,
+    pub unrecognized_extensions: HashMap<&'a[u8], untrusted::Input<'a>>,
 }
 
 pub fn parse_cert<'a>(
@@ -91,6 +93,7 @@ pub(crate) fn parse_cert_internal<'a>(
             eku: None,
             name_constraints: None,
             subject_alt_name: None,
+            unrecognized_extensions: HashMap::new(),
         };
 
         // mozilla::pkix allows the extensions to be omitted. However, since
@@ -163,7 +166,7 @@ enum Understood {
 }
 
 fn remember_extension<'a>(
-    cert: &mut Cert<'a>, extn_id: untrusted::Input, value: untrusted::Input<'a>,
+    cert: &mut Cert<'a>, extn_id: untrusted::Input<'a>, value: untrusted::Input<'a>,
 ) -> Result<Understood, Error> {
     // We don't do anything with certificate policies so we can safely ignore
     // all policy-related stuff. We assume that the policy-related extensions
@@ -172,34 +175,46 @@ fn remember_extension<'a>(
     // id-ce 2.5.29
     static ID_CE: [u8; 2] = oid![2, 5, 29];
 
-    if extn_id.len() != ID_CE.len() + 1 || !extn_id.as_slice_less_safe().starts_with(&ID_CE) {
-        return Ok(Understood::No);
-    }
+    let mut ret = Ok(Understood::Yes);
 
-    let out = match *extn_id.as_slice_less_safe().last().unwrap() {
+    let extension_id = &*extn_id.as_slice_less_safe();
+
+    let out = match extension_id {
         // id-ce-keyUsage 2.5.29.15. We ignore the KeyUsage extension. For CA
         // certificates, BasicConstraints.cA makes KeyUsage redundant. Firefox
         // and other common browsers do not check KeyUsage for end-entities,
         // though it would be kind of nice to ensure that a KeyUsage without
         // the keyEncipherment bit could not be used for RSA key exchange.
-        15 => {
-            return Ok(Understood::Yes);
+        [85, 29, 15] => {
+             return ret;
         },
 
         // id-ce-subjectAltName 2.5.29.17
-        17 => &mut cert.subject_alt_name,
+        [85, 29, 17] => &mut cert.subject_alt_name,
 
         // id-ce-basicConstraints 2.5.29.19
-        19 => &mut cert.basic_constraints,
+        [85, 29, 19] => &mut cert.basic_constraints,
 
         // id-ce-nameConstraints 2.5.29.30
-        30 => &mut cert.name_constraints,
+        [85, 29, 30] => &mut cert.name_constraints,
 
         // id-ce-extKeyUsage 2.5.29.37
-        37 => &mut cert.eku,
+        [85, 29, 37] => &mut cert.eku,
 
+        //_ => return Ok(Understood::No),
         _ => {
-            return Ok(Understood::No);
+            ret = Ok(Understood::No);
+            let value = value.read_all(Error::BadDER, |value| {
+                Ok(value.read_bytes_to_end())
+            })?;
+            match cert.unrecognized_extensions.insert(extension_id, value) {
+                Some(_) => {
+                    // the certificate contains more than one instance of this extension
+                    ret = Err(Error::ExtensionValueInvalid);
+                    return ret;
+                }
+                None => return ret,
+            }
         },
     };
 
@@ -207,7 +222,8 @@ fn remember_extension<'a>(
         Some(..) => {
             // The certificate contains more than one instance of this
             // extension.
-            return Err(Error::ExtensionValueInvalid);
+            ret = Err(Error::ExtensionValueInvalid);
+            return ret;
         },
         None => {
             // All the extensions that we care about are wrapped in a SEQUENCE.
@@ -218,5 +234,5 @@ fn remember_extension<'a>(
         },
     }
 
-    Ok(Understood::Yes)
+    return ret;
 }
