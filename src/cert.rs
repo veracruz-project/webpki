@@ -172,9 +172,6 @@ fn remember_extension<'a>(
     // all policy-related stuff. We assume that the policy-related extensions
     // are not marked critical.
 
-    // id-ce 2.5.29
-    static ID_CE: [u8; 2] = oid![2, 5, 29];
-
     let mut ret = Ok(Understood::Yes);
 
     let extension_id = &*extn_id.as_slice_less_safe();
