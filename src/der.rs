@@ -153,9 +153,3 @@ pub fn time_choice<'a>(input: &mut untrusted::Reader<'a>) -> Result<time::Time, 
     })
 }
 
-macro_rules! oid {
-    ( $first:expr, $second:expr, $( $tail:expr ),* ) =>
-    (
-        [(40 * $first) + $second, $( $tail ),*]
-    )
-}
