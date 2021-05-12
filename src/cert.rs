@@ -172,8 +172,6 @@ fn remember_extension<'a>(
     // all policy-related stuff. We assume that the policy-related extensions
     // are not marked critical.
 
-    let mut ret = Ok(Understood::Yes);
-
     let extension_id = &*extn_id.as_slice_less_safe();
 
     let out = match extension_id {
@@ -183,7 +181,7 @@ fn remember_extension<'a>(
         // though it would be kind of nice to ensure that a KeyUsage without
         // the keyEncipherment bit could not be used for RSA key exchange.
         [85, 29, 15] => {
-             return ret;
+             return Ok(Understood::Yes);
         },
 
         // id-ce-subjectAltName 2.5.29.17
@@ -198,19 +196,16 @@ fn remember_extension<'a>(
         // id-ce-extKeyUsage 2.5.29.37
         [85, 29, 37] => &mut cert.eku,
 
-        //_ => return Ok(Understood::No),
-        _ => {
-            ret = Ok(Understood::No);
+        _ => { // This is not a recognized extension, add it to the hash and return
             let value = value.read_all(Error::BadDER, |value| {
                 Ok(value.read_bytes_to_end())
             })?;
             match cert.unrecognized_extensions.insert(extension_id, value) {
                 Some(_) => {
                     // the certificate contains more than one instance of this extension
-                    ret = Err(Error::ExtensionValueInvalid);
-                    return ret;
+                    return Err(Error::ExtensionValueInvalid);
                 }
-                None => return ret,
+                None => return Ok(Understood::No),
             }
         },
     };
@@ -219,8 +214,7 @@ fn remember_extension<'a>(
         Some(..) => {
             // The certificate contains more than one instance of this
             // extension.
-            ret = Err(Error::ExtensionValueInvalid);
-            return ret;
+            return Err(Error::ExtensionValueInvalid);
         },
         None => {
             // All the extensions that we care about are wrapped in a SEQUENCE.
@@ -231,5 +225,5 @@ fn remember_extension<'a>(
         },
     }
 
-    return ret;
+    return Ok(Understood::Yes);
 }
