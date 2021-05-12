@@ -143,8 +143,8 @@ impl<'a> EndEntityCert<'a> {
     /// Retrieves the raw extensions that were found in the certificate but were
     /// not recognized by the webpki library. These could be custom extensions
     /// or standard extensions not relevant to how the library operates
-    pub fn unrecognized_extensions(&self) -> std::collections::HashMap<&'a[u8], untrusted::Input<'a>> {
-        return self.inner.unrecognized_extensions.clone();
+    pub fn unrecognized_extensions(&self) -> &std::collections::HashMap<&'a[u8], untrusted::Input<'a>> {
+        return &self.inner.unrecognized_extensions;
     }
 
     /// Verifies that the end-entity certificate is valid for use by a TLS
