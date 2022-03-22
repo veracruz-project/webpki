@@ -1,0 +1,266 @@
+name: ci
+permissions:
+  contents: read
+on:
+  pull_request:
+  push:
+jobs:
+  rustfmt:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: rustfmt
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - run: mk/clippy.sh
+
+  audit:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - uses: briansmith/actions-cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-v2-cargo-audit-0.13.1
+
+      - run: cargo install cargo-audit --vers "0.13.1"
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - run: cargo generate-lockfile
+
+      - run: cargo audit --deny warnings
+
+  deny:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - uses: briansmith/actions-cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/cargo-deny
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-v2-cargo-deny-locked-0.8.5
+
+      - run: cargo install cargo-deny --locked --vers "0.8.5"
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - run: cargo deny check
+
+  # Verify that documentation builds.
+  rustdoc:
+    runs-on: ubuntu-18.04
+
+    strategy:
+      matrix:
+        rust_channel:
+          - stable
+          - beta
+          - nightly
+
+        include:
+          - target: x86_64-unknown-linux-gnu
+
+    steps:
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          override: true
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.rust_channel }}
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - run: |
+          cargo doc --all-features
+
+  package:
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - run: cargo package
+
+
+  test:
+    runs-on: ${{ matrix.host_os }}
+
+    strategy:
+      matrix:
+        features:
+          - # Default
+          - --features=alloc
+          - --all-features
+
+        target:
+          # There is no platform-specific code in webpki. Choose a handful of
+          # platforms mostly to smoketest that the build machinery in mk/ is
+          # portable.
+          - arm-unknown-linux-gnueabihf
+          - i686-pc-windows-msvc
+          - x86_64-unknown-linux-musl
+          - x86_64-unknown-linux-gnu
+
+        mode:
+          - # debug
+          - --release
+
+        rust_channel:
+          - stable
+          - nightly
+
+          # MSRV: Rust 1.47 and later have bugs in rustc that prevent some
+          # projects from upgrading past 1.46 yet. So, maintain compatibility
+          # for 1.46 until those bugs are fixed.
+          - 1.46.0
+
+          - beta
+
+        exclude:
+          # 1.46.0 doesn't support `-Clink-self-contained`.
+          - target: x86_64-unknown-linux-musl
+            rust_channel: 1.46.0
+
+        include:
+          - target: arm-unknown-linux-gnueabihf
+            host_os: ubuntu-18.04
+
+          - target: i686-pc-windows-msvc
+            host_os: windows-latest
+
+          - target: x86_64-unknown-linux-musl
+            host_os: ubuntu-18.04
+
+          - target: x86_64-unknown-linux-gnu
+            host_os: ubuntu-18.04
+
+    steps:
+      - if: ${{ contains(matrix.host_os, 'ubuntu') }}
+        run: sudo apt-get update -y
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - if: ${{ !contains(matrix.host_os, 'windows') }}
+        run: mk/install-build-tools.sh --target=${{ matrix.target }} ${{ matrix.features }}
+
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          override: true
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.rust_channel }}
+
+      - if: ${{ matrix.target == 'aarch64-apple-darwin' }}
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_12.2.app/Contents/Developer" >> $GITHUB_ENV
+
+      - if: ${{ !contains(matrix.host_os, 'windows') }}
+        run: |
+          mk/cargo.sh test -vv --target=${{ matrix.target }} ${{ matrix.cargo_options }} ${{ matrix.features }} ${{ matrix.mode }}
+
+      - if: ${{ contains(matrix.host_os, 'windows') }}
+        run: |
+          cargo test -vv --target=${{ matrix.target }} ${{ matrix.cargo_options }} ${{ matrix.features }} ${{ matrix.mode }}
+
+  coverage:
+    runs-on: ${{ matrix.host_os }}
+
+    strategy:
+      matrix:
+        features:
+          - --all-features
+
+        # TODO: targets
+        target:
+          - x86_64-unknown-linux-musl
+
+        mode:
+          - # debug
+
+        # Coverage collection is Nightly-only
+        rust_channel:
+          - nightly
+
+        # TODO: targets
+        include:
+          - target: x86_64-unknown-linux-musl
+            host_os: ubuntu-18.04
+
+    steps:
+      - if: ${{ contains(matrix.host_os, 'ubuntu') }}
+        run: sudo apt-get update -y
+
+      - uses: briansmith/actions-checkout@v2
+        with:
+          persist-credentials: false
+
+      - if: ${{ !contains(matrix.host_os, 'windows') }}
+        run: RING_COVERAGE=1 mk/install-build-tools.sh --target=${{ matrix.target }} ${{ matrix.features }}
+
+      - uses: briansmith/actions-rs-toolchain@v1
+        with:
+          override: true
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.rust_channel }}
+
+      - if: ${{ matrix.target == 'aarch64-apple-darwin' }}
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_12.2.app/Contents/Developer" >> $GITHUB_ENV
+
+      - if: ${{ !contains(matrix.host_os, 'windows') }}
+        run: |
+          RING_COVERAGE=1 mk/cargo.sh +${{ matrix.rust_channel }} test -vv --target=${{ matrix.target }} ${{ matrix.cargo_options }} ${{ matrix.features }} ${{ matrix.mode }}
+
+      - uses: briansmith/codecov-codecov-action@v1
+        with:
+          directory: ./target/${{ matrix.target }}/debug/coverage/reports
+          fail_ci_if_error: true
+          verbose: true

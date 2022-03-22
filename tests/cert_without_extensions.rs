@@ -1,4 +1,4 @@
-// Copyright 2015-2020 Brian Smith.
+// Copyright 2021 Brian Smith.
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -12,14 +12,16 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-mod dns_name;
-pub use dns_name::{DnsNameRef, InvalidDnsNameError};
+use core::convert::TryFrom;
 
-/// Requires the `alloc` feature.
-#[cfg(feature = "alloc")]
-pub use dns_name::DnsName;
+#[test]
+fn cert_without_extensions_test() {
+    // Check the certificate is valid with
+    // `openssl x509 -in cert_without_extensions.der -inform DER -text -noout`
+    const CERT_WITHOUT_EXTENSIONS_DER: &[u8] = include_bytes!("cert_without_extensions.der");
 
-mod ip_address;
-
-mod verify;
-pub(super) use verify::{check_name_constraints, verify_cert_dns_name};
+    assert_eq!(
+        Some(webpki::Error::MissingOrMalformedExtensions),
+        webpki::EndEntityCert::try_from(CERT_WITHOUT_EXTENSIONS_DER).err()
+    );
+}

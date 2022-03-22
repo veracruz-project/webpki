@@ -15,19 +15,19 @@
 use crate::{der, signed_data, Error};
 use std::collections::HashMap;
 
-pub enum EndEntityOrCA<'a> {
+pub enum EndEntityOrCa<'a> {
     EndEntity,
-    CA(&'a Cert<'a>),
+    Ca(&'a Cert<'a>),
 }
 
 pub struct Cert<'a> {
-    pub ee_or_ca: EndEntityOrCA<'a>,
+    pub ee_or_ca: EndEntityOrCa<'a>,
 
     pub signed_data: signed_data::SignedData<'a>,
     pub issuer: untrusted::Input<'a>,
     pub validity: untrusted::Input<'a>,
     pub subject: untrusted::Input<'a>,
-    pub spki: untrusted::Input<'a>,
+    pub spki: der::Value<'a>,
 
     pub basic_constraints: Option<untrusted::Input<'a>>,
     pub eku: Option<untrusted::Input<'a>>,
@@ -37,7 +37,8 @@ pub struct Cert<'a> {
 }
 
 pub fn parse_cert<'a>(
-    cert_der: untrusted::Input<'a>, ee_or_ca: EndEntityOrCA<'a>,
+    cert_der: untrusted::Input<'a>,
+    ee_or_ca: EndEntityOrCa<'a>,
 ) -> Result<Cert<'a>, Error> {
     parse_cert_internal(cert_der, ee_or_ca, certificate_serial_number)
 }
@@ -46,7 +47,8 @@ pub fn parse_cert<'a>(
 /// and by `cert_der_as_trust_anchor` for trust anchors encoded as
 /// certificates.
 pub(crate) fn parse_cert_internal<'a>(
-    cert_der: untrusted::Input<'a>, ee_or_ca: EndEntityOrCA<'a>,
+    cert_der: untrusted::Input<'a>,
+    ee_or_ca: EndEntityOrCa<'a>,
     serial_number: fn(input: &mut untrusted::Reader<'_>) -> Result<(), Error>,
 ) -> Result<Cert<'a>, Error> {
     let (tbs, signed_data) = cert_der.read_all(Error::BadDER, |cert_der| {
@@ -73,7 +75,7 @@ pub(crate) fn parse_cert_internal<'a>(
         let issuer = der::expect_tag_and_get_value(tbs, der::Tag::Sequence)?;
         let validity = der::expect_tag_and_get_value(tbs, der::Tag::Sequence)?;
         let subject = der::expect_tag_and_get_value(tbs, der::Tag::Sequence)?;
-        let spki = der::expect_tag_and_get_value(tbs, der::Tag::Sequence)?;
+        let spki = der::expect_tag(tbs, der::Tag::Sequence)?;
 
         // In theory there could be fields [1] issuerUniqueID and [2]
         // subjectUniqueID, but in practice there never are, and to keep the
@@ -102,10 +104,10 @@ pub(crate) fn parse_cert_internal<'a>(
         // special logic for handling critical Netscape Cert Type extensions.
         // That has been intentionally omitted.
 
-        der::nested_mut(
+        der::nested(
             tbs,
             der::Tag::ContextSpecificConstructed3,
-            Error::BadDER,
+            Error::MissingOrMalformedExtensions,
             |tagged| {
                 der::nested_of_mut(
                     tagged,
@@ -136,7 +138,7 @@ fn version3(input: &mut untrusted::Reader) -> Result<(), Error> {
     der::nested(
         input,
         der::Tag::ContextSpecificConstructed0,
-        Error::BadDER,
+        Error::UnsupportedCertVersion,
         |input| {
             let version = der::small_nonnegative_integer(input)?;
             if version != 2 {
@@ -166,7 +168,9 @@ enum Understood {
 }
 
 fn remember_extension<'a>(
-    cert: &mut Cert<'a>, extn_id: untrusted::Input<'a>, value: untrusted::Input<'a>,
+    cert: &mut Cert<'a>,
+    extn_id: untrusted::Input,
+    value: untrusted::Input<'a>,
 ) -> Result<Understood, Error> {
     // We don't do anything with certificate policies so we can safely ignore
     // all policy-related stuff. We assume that the policy-related extensions
@@ -180,9 +184,9 @@ fn remember_extension<'a>(
         // and other common browsers do not check KeyUsage for end-entities,
         // though it would be kind of nice to ensure that a KeyUsage without
         // the keyEncipherment bit could not be used for RSA key exchange.
-        [85, 29, 15] => {
-             return Ok(Understood::Yes);
-        },
+        15 => {
+            return Ok(Understood::Yes);
+        }
 
         // id-ce-subjectAltName 2.5.29.17
         [85, 29, 17] => &mut cert.subject_alt_name,
@@ -196,18 +200,9 @@ fn remember_extension<'a>(
         // id-ce-extKeyUsage 2.5.29.37
         [85, 29, 37] => &mut cert.eku,
 
-        _ => { // This is not a recognized extension, add it to the hash and return
-            let value = value.read_all(Error::BadDER, |value| {
-                Ok(value.read_bytes_to_end())
-            })?;
-            match cert.unrecognized_extensions.insert(extension_id, value) {
-                Some(_) => {
-                    // the certificate contains more than one instance of this extension
-                    return Err(Error::ExtensionValueInvalid);
-                }
-                None => return Ok(Understood::No),
-            }
-        },
+        _ => {
+            return Ok(Understood::No);
+        }
     };
 
     match *out {
@@ -215,14 +210,14 @@ fn remember_extension<'a>(
             // The certificate contains more than one instance of this
             // extension.
             return Err(Error::ExtensionValueInvalid);
-        },
+        }
         None => {
             // All the extensions that we care about are wrapped in a SEQUENCE.
             let sequence_value = value.read_all(Error::BadDER, |value| {
                 der::expect_tag_and_get_value(value, der::Tag::Sequence)
             })?;
             *out = Some(sequence_value);
-        },
+        }
     }
 
     return Ok(Understood::Yes);

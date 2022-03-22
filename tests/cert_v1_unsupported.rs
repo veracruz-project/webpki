@@ -1,4 +1,4 @@
-// Copyright 2015-2020 Brian Smith.
+// Copyright 2021 Brian Smith.
 //
 // Permission to use, copy, modify, and/or distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -12,14 +12,16 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-mod dns_name;
-pub use dns_name::{DnsNameRef, InvalidDnsNameError};
+use core::convert::TryFrom;
 
-/// Requires the `alloc` feature.
-#[cfg(feature = "alloc")]
-pub use dns_name::DnsName;
+#[test]
+fn test_cert_v1_unsupported() {
+    // Check with `openssl x509 -text -noout -in cert_v1.der -inform DER`
+    // to verify this is a correct version 1 certificate.
+    const CERT_V1_DER: &[u8] = include_bytes!("cert_v1.der");
 
-mod ip_address;
-
-mod verify;
-pub(super) use verify::{check_name_constraints, verify_cert_dns_name};
+    assert_eq!(
+        Some(webpki::Error::UnsupportedCertVersion),
+        webpki::EndEntityCert::try_from(CERT_V1_DER).err()
+    );
+}
