@@ -33,7 +33,7 @@ pub struct Cert<'a> {
     pub eku: Option<untrusted::Input<'a>>,
     pub name_constraints: Option<untrusted::Input<'a>>,
     pub subject_alt_name: Option<untrusted::Input<'a>>,
-    pub unrecognized_extensions: HashMap<&'a[u8], untrusted::Input<'a>>,
+    pub unrecognized_extensions: HashMap<&'a [u8], untrusted::Input<'a>>,
 }
 
 pub fn parse_cert<'a>(
@@ -220,5 +220,5 @@ fn remember_extension<'a>(
         }
     }
 
-    return Ok(Understood::Yes);
+    Ok(Understood::Yes)
 }

@@ -13,8 +13,8 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 use crate::{
-    cert, name, signed_data, verify_cert, DnsNameRef, Error, SignatureAlgorithm,
-    TlsClientTrustAnchors, TlsServerTrustAnchors, Time,
+    cert, name, signed_data, verify_cert, DnsNameRef, Error, SignatureAlgorithm, Time,
+    TlsClientTrustAnchors, TlsServerTrustAnchors,
 };
 use core::convert::TryFrom;
 
@@ -86,8 +86,10 @@ impl<'a> EndEntityCert<'a> {
     /// Retrieves the raw extensions that were found in the certificate but were
     /// not recognized by the webpki library. These could be custom extensions
     /// or standard extensions not relevant to how the library operates
-    pub fn unrecognized_extensions(&self) -> &std::collections::HashMap<&'a[u8], untrusted::Input<'a>> {
-        return &self.inner.unrecognized_extensions;
+    pub fn unrecognized_extensions(
+        &self
+    ) -> &std::collections::HashMap<&'a[u8], untrusted::Input<'a>> {
+        &self.inner.unrecognized_extensions
     }
 
     /// Verifies that the end-entity certificate is valid for use by a TLS

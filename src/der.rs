@@ -164,4 +164,3 @@ pub fn time_choice(input: &mut untrusted::Reader) -> Result<time::Time, Error> {
         calendar::time_from_ymdhms_utc(year, month, day_of_month, hours, minutes, seconds)
     })
 }
-
