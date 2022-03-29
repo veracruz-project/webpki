@@ -184,7 +184,7 @@ fn remember_extension<'a>(
         // and other common browsers do not check KeyUsage for end-entities,
         // though it would be kind of nice to ensure that a KeyUsage without
         // the keyEncipherment bit could not be used for RSA key exchange.
-        15 => {
+        [15] => {
             return Ok(Understood::Yes);
         }
 

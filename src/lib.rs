@@ -55,7 +55,7 @@ pub use {
         ECDSA_P384_SHA384, ED25519,
     },
     time::Time,
-    trust_anchor::{TLSClientTrustAnchors, TLSServerTrustAnchors, TrustAnchor},
+    trust_anchor::{TlsClientTrustAnchors, TlsServerTrustAnchors, TrustAnchor},
 };
 
 #[cfg(feature = "alloc")]

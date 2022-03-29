@@ -22,7 +22,7 @@ license-file = "LICENSE"
 name = "webpki"
 readme = "README.md"
 repository = "https://github.com/briansmith/webpki"
-version = "0.21.4"
+version = "0.22.0"
 
 include = [
     "Cargo.toml",
@@ -69,13 +69,13 @@ all-features = true
 name = "webpki"
 
 [features]
-default = ["std", "trust_anchor_util", "ring/non_sgx"]
+default = ["std", "trust_anchor_util"]
 alloc = ["ring/alloc"]
 std = ["alloc"]
 trust_anchor_util = ["std"]
 
 [dependencies]
-ring = { git = "https://github.com/veracruz-project/ring.git", branch = "veracruz" }
+ring = "0.16.20"
 untrusted = "0.7.1"
 
 [dev-dependencies]
