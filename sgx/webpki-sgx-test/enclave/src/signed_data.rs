@@ -15,7 +15,7 @@ fn test_verify_signed_data(file_name: &str, expected_result: Result<(), Error>) 
     let tsd = parse_test_signed_data(file_name);
     let spki_value = untrusted::Input::from(&tsd.spki);
     let spki_value = spki_value
-        .read_all(Error::BadDER, |input| {
+        .read_all(Error::BadDer, |input| {
             der::expect_tag_and_get_value(input, der::Tag::Sequence)
         })
         .unwrap();
@@ -28,14 +28,14 @@ fn test_verify_signed_data(file_name: &str, expected_result: Result<(), Error>) 
 
     let algorithm = untrusted::Input::from(&tsd.algorithm);
     let algorithm = algorithm
-        .read_all(Error::BadDER, |input| {
+        .read_all(Error::BadDer, |input| {
             der::expect_tag_and_get_value(input, der::Tag::Sequence)
         })
         .unwrap();
 
     let signature = untrusted::Input::from(&tsd.signature);
     let signature = signature
-        .read_all(Error::BadDER, |input| {
+        .read_all(Error::BadDer, |input| {
             der::bit_string_with_no_unused_bits(input)
         })
         .unwrap();
@@ -69,7 +69,7 @@ fn test_verify_signed_data_signature_outer(file_name: &str, expected_error: Erro
     let signature = untrusted::Input::from(&tsd.signature);
     assert_eq!(
         Err(expected_error),
-        signature.read_all(Error::BadDER, |input| {
+        signature.read_all(Error::BadDer, |input| {
             der::bit_string_with_no_unused_bits(input)
         })
     );
@@ -88,13 +88,13 @@ fn test_parse_spki_bad_outer(file_name: &str, expected_error: Error) {
     let spki = untrusted::Input::from(&tsd.spki);
     assert_eq!(
         Err(expected_error),
-        spki.read_all(Error::BadDER, |input| {
+        spki.read_all(Error::BadDer, |input| {
             der::expect_tag_and_get_value(input, der::Tag::Sequence)
         })
     );
 }
 
-// XXX: Some of the BadDER tests should have better error codes, maybe?
+// XXX: Some of the BadDer tests should have better error codes, maybe?
 
 // XXX: We should have a variant of this test with a SHA-256 digest that gives
 // `Error::UnsupportedSignatureAlgorithmForPublicKey`.
@@ -106,7 +106,7 @@ test_verify_signed_data!(
 test_verify_signed_data_signature_outer!(
     test_ecdsa_prime256v1_sha512_unused_bits_signature,
     "ecdsa-prime256v1-sha512-unused-bits-signature.pem",
-    Error::BadDER
+    Error::BadDer
 );
 // XXX: We should have a variant of this test with a SHA-256 digest that gives
 // `Error::UnsupportedSignatureAlgorithmForPublicKey`.
@@ -159,12 +159,12 @@ test_verify_signed_data!(
 test_parse_spki_bad_outer!(
     test_rsa_pkcs1_sha1_bad_key_der_length,
     "rsa-pkcs1-sha1-bad-key-der-length.pem",
-    Error::BadDER
+    Error::BadDer
 );
 test_parse_spki_bad_outer!(
     test_rsa_pkcs1_sha1_bad_key_der_null,
     "rsa-pkcs1-sha1-bad-key-der-null.pem",
-    Error::BadDER
+    Error::BadDer
 );
 test_verify_signed_data!(
     test_rsa_pkcs1_sha1_key_params_absent,
@@ -198,7 +198,7 @@ test_verify_signed_data!(
 test_parse_spki_bad_outer!(
     test_rsa_pkcs1_sha256_key_encoded_ber,
     "rsa-pkcs1-sha256-key-encoded-ber.pem",
-    Error::BadDER
+    Error::BadDer
 );
 test_verify_signed_data!(
     test_rsa_pkcs1_sha256_spki_non_null_params,
