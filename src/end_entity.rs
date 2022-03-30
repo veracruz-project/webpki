@@ -87,8 +87,8 @@ impl<'a> EndEntityCert<'a> {
     /// not recognized by the webpki library. These could be custom extensions
     /// or standard extensions not relevant to how the library operates
     pub fn unrecognized_extensions(
-        &self
-    ) -> &std::collections::HashMap<&'a[u8], untrusted::Input<'a>> {
+        &self,
+    ) -> &std::collections::HashMap<&'a [u8], untrusted::Input<'a>> {
         &self.inner.unrecognized_extensions
     }
 
