@@ -13,6 +13,7 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 use crate::{der, signed_data, Error};
+#[cfg(feature = "alloc")]
 use std::collections::HashMap;
 
 pub enum EndEntityOrCa<'a> {
@@ -33,6 +34,7 @@ pub struct Cert<'a> {
     pub eku: Option<untrusted::Input<'a>>,
     pub name_constraints: Option<untrusted::Input<'a>>,
     pub subject_alt_name: Option<untrusted::Input<'a>>,
+    #[cfg(feature = "alloc")]
     pub unrecognized_extensions: HashMap<&'a[u8], untrusted::Input<'a>>,
 }
 
@@ -95,6 +97,7 @@ pub(crate) fn parse_cert_internal<'a>(
             eku: None,
             name_constraints: None,
             subject_alt_name: None,
+            #[cfg(feature = "alloc")]
             unrecognized_extensions: HashMap::new(),
         };
 
@@ -177,7 +180,7 @@ fn remember_extension<'a>(
     // are not marked critical.
 
     // id-ce 2.5.29
-    static ID_CE: [u8; 2] = oid![2, 5, 29];
+    static _ID_CE: [u8; 2] = oid![2, 5, 29];
 
     let extension_id = &*extn_id.as_slice_less_safe();
 
@@ -204,9 +207,11 @@ fn remember_extension<'a>(
         [85, 29, 37] => &mut cert.eku,
 
         _ => { // This is not a recognized extension, add it to the hash and return
+            #[cfg(feature = "alloc")]
             let value = value.read_all(Error::BadDer, |value| {
                 Ok(value.read_bytes_to_end())
             })?;
+            #[cfg(feature = "alloc")]
             match cert.unrecognized_extensions.insert(extension_id, value) {
                 Some(_) => {
                     // the certificate contains more than one instance of this extension
@@ -218,6 +223,8 @@ fn remember_extension<'a>(
                     return Ok(Understood::No)
                 },
             }
+            #[cfg(not(feature = "alloc"))]
+            return Ok(Understood::No)
         }
     };
 
