@@ -207,6 +207,10 @@ impl<'a> EndEntityCert<'a> {
     /// Retrieves the raw extensions that were found in the certificate but were
     /// not recognized by the webpki library. These could be custom extensions
     /// or standard extensions not relevant to how the library operates
+    ///
+    /// Requires the `alloc` default feature; i.e. this isn't available in
+    /// `#![no_std]` configurations.
+    #[cfg(feature = "alloc")]
     pub fn unrecognized_extensions(&self) -> &std::collections::HashMap<&'a[u8], untrusted::Input<'a>> {
         return &self.inner.unrecognized_extensions;
     }
